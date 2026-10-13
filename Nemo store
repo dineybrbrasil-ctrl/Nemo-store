@@ -1,0 +1,349 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+local remote = ReplicatedStorage:WaitForChild("BrasilMenuAction", 10)
+if not remote then
+warn("Brasil Menu: RemoteEvent não encontrado. Instale BrasilMenuServer em ServerScriptService.")
+return
+end
+local gui = Instance.new("ScreenGui")
+gui.Name = "BrasilMenu"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0, 330, 0, 390)
+main.Position = UDim2.new(0.5, -165, 0.5, -195)
+main.BackgroundColor3 = Color3.fromRGB(22, 25, 33)
+main.BorderSizePixel = 0
+main.Active = true
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+local scale = Instance.new("UIScale")
+scale.Scale = UserInputService.TouchEnabled and 0.92 or 1
+scale.Parent = main
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -50, 0, 42)
+title.Position = UDim2.fromOffset(12, 0)
+title.BackgroundTransparency = 1
+title.Text = "🇧🇷 Brasil Menu"
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 19
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
+local hide = Instance.new("TextButton")
+hide.Size = UDim2.fromOffset(32, 30)
+hide.Position = UDim2.new(1, -40, 0, 6)
+hide.Text = "—"
+hide.TextSize = 20
+hide.Font = Enum.Font.GothamBold
+hide.TextColor3 = Color3.new(1,1,1)
+hide.BackgroundColor3 = Color3.fromRGB(55, 61, 75)
+hide.Parent = main
+Instance.new("UICorner", hide).CornerRadius = UDim.new(0, 8)
+local body = Instance.new("ScrollingFrame")
+body.Position = UDim2.fromOffset(12, 50)
+body.Size = UDim2.new(1, -24, 1, -62)
+body.BackgroundTransparency = 1
+body.BorderSizePixel = 0
+body.ScrollBarThickness = 4
+body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+body.CanvasSize = UDim2.new()
+body.Parent = main
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 7)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = body
+local function makeLabel(text)
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -4, 0, 25)
+label.BackgroundTransparency = 1
+label.Text = text
+label.TextColor3 = Color3.fromRGB(125, 204, 255)
+label.Font = Enum.Font.GothamBold
+label.TextSize = 13
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = body
+return label
+end
+local function makeButton(text, action, value)
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -4, 0, 36)
+button.BackgroundColor3 = Color3.fromRGB(43, 49, 63)
+button.TextColor3 = Color3.new(1,1,1)
+button.Font = Enum.Font.GothamMedium
+button.TextSize = 14
+button.Text = text
+button.AutoButtonColor = true
+button.Parent = body
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+button.Activated:Connect(function()
+remote:FireServer(action, value)
+end)
+return button
+end
+local function makeSlider(labelText, action, minValue, maxValue, defaultValue)
+local holder = Instance.new("Frame")
+holder.Size = UDim2.new(1, -4, 0, 58)
+holder.BackgroundColor3 = Color3.fromRGB(32, 37, 48)
+holder.Parent = body
+Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 8)
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -16, 0, 24)
+label.Position = UDim2.fromOffset(8, 2)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.new(1,1,1)
+label.Font = Enum.Font.Gotham
+label.TextSize = 13
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Text = labelText .. ": " .. defaultValue
+label.Parent = holder
+local bar = Instance.new("Frame")
+bar.Size = UDim2.new(1, -20, 0, 8)
+bar.Position = UDim2.fromOffset(10, 36)
+bar.BackgroundColor3 = Color3.fromRGB(65, 73, 91)
+bar.BorderSizePixel = 0
+bar.Parent = holder
+Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+local fill = Instance.new("Frame")
+fill.Size = UDim2.new((defaultValue-minValue)/(maxValue-minValue), 0, 1, 0)
+fill.BackgroundColor3 = Color3.fromRGB(50, 160, 240)
+fill.BorderSizePixel = 0
+fill.Parent = bar
+Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+local knob = Instance.new("TextButton")
+knob.Size = UDim2.fromOffset(18, 18)
+knob.AnchorPoint = Vector2.new(0.5, 0.5)
+knob.Position = UDim2.new(fill.Size.X.Scale, 0, 0.5, 0)
+knob.Text = ""
+knob.BackgroundColor3 = Color3.new(1,1,1)
+knob.Parent = bar
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+local dragging = false
+local function setFromX(x)
+local pct = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+local val = math.floor(minValue + pct * (maxValue - minValue) + 0.5)
+fill.Size = UDim2.new(pct, 0, 1, 0)
+knob.Position = UDim2.new(pct, 0, 0.5, 0)
+label.Text = labelText .. ": " .. val
+remote:FireServer(action, val)
+end
+knob.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+dragging = true
+setFromX(input.Position.X)
+end
+end)
+UserInputService.InputChanged:Connect(function(input)
+if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+setFromX(input.Position.X)
+end
+end)
+UserInputService.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+dragging = false
+end
+end)
+end
+makeLabel("MOVIMENTO")
+makeSlider("Velocidade", "Speed", 16, 100, 16)
+makeSlider("Pulo", "Jump", 50, 150, 50)
+makeButton("Resetar personagem", "Reset")
+makeButton("Mostrar coordenadas no console", "Coordinates")
+makeLabel("FERRAMENTAS DE TESTE")
+makeButton("Ativar/desativar voo de teste", "Fly")
+makeButton("Ativar/desativar noclip de teste", "Noclip")
+makeButton("Destacar NPCs de teste", "HighlightNPCs")
+makeButton("Teleportar para Spawn", "TeleportSpawn")
+makeButton("Teleportar para Lobby", "TeleportLobby")
+makeButton("Fechar painel", "Close")
+local reopen = Instance.new("TextButton")
+reopen.Name = "Reopen"
+reopen.Size = UDim2.fromOffset(48, 48)
+reopen.Position = UDim2.new(0, 14, 0.5, -24)
+reopen.BackgroundColor3 = Color3.fromRGB(16, 116, 190)
+reopen.Text = "BR"
+reopen.TextColor3 = Color3.new(1,1,1)
+reopen.Font = Enum.Font.GothamBold
+reopen.TextSize = 15
+reopen.Visible = false
+reopen.Parent = gui
+Instance.new("UICorner", reopen).CornerRadius = UDim.new(1, 0)
+hide.Activated:Connect(function()
+main.Visible = false
+reopen.Visible = true
+end)
+reopen.Activated:Connect(function()
+main.Visible = true
+reopen.Visible = false
+end)
+remote.OnClientEvent:Connect(function(action, data)
+if action == "Notice" then
+warn("[Brasil Menu] " .. tostring(data))
+elseif action == "Coordinates" then
+print("[Brasil Menu] Coordenadas: " .. tostring(data))
+elseif action == "Close" then
+gui.Enabled = false
+end
+end)
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local ADMINS = {
+[7395796140] = true,
+}
+local remote = ReplicatedStorage:FindFirstChild("BrasilMenuAction")
+if not remote then
+remote = Instance.new("RemoteEvent")
+remote.Name = "BrasilMenuAction"
+remote.Parent = ReplicatedStorage
+end
+local states = {}
+local function isAdmin(player)
+return ADMINS[player.UserId] == true
+end
+local function notify(player, message)
+remote:FireClient(player, "Notice", message)
+end
+local function getHumanoid(player)
+local character = player.Character
+return character and character:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot(player)
+local character = player.Character
+return character and character:FindFirstChild("HumanoidRootPart")
+end
+local function setNoclip(player, enabled)
+local character = player.Character
+if not character then return end
+states[player] = states[player] or {}
+states[player].noclip = enabled
+for _, obj in ipairs(character:GetDescendants()) do
+if obj:IsA("BasePart") then
+if enabled then
+if obj:GetAttribute("BrasilOriginalCanCollide") == nil then
+obj:SetAttribute("BrasilOriginalCanCollide", obj.CanCollide)
+end
+obj.CanCollide = false
+else
+local original = obj:GetAttribute("BrasilOriginalCanCollide")
+if original ~= nil then
+obj.CanCollide = original
+obj:SetAttribute("BrasilOriginalCanCollide", nil)
+end
+end
+end
+end
+end
+local function setFly(player, enabled)
+local root = getRoot(player)
+if not root then return end
+states[player] = states[player] or {}
+states[player].fly = enabled
+if enabled then
+local attachment = root:FindFirstChild("BrasilFlyAttachment") or Instance.new("Attachment")
+attachment.Name = "BrasilFlyAttachment"
+attachment.Parent = root
+local velocity = root:FindFirstChild("BrasilFlyVelocity") or Instance.new("LinearVelocity")
+velocity.Name = "BrasilFlyVelocity"
+velocity.Attachment0 = attachment
+velocity.RelativeTo = Enum.ActuatorRelativeTo.World
+velocity.VectorVelocity = Vector3.new(0, 22, 0)
+velocity.MaxForce = 100000
+velocity.Parent = root
+else
+local v = root:FindFirstChild("BrasilFlyVelocity")
+if v then v:Destroy() end
+local a = root:FindFirstChild("BrasilFlyAttachment")
+if a then a:Destroy() end
+end
+end
+local function teleportNamed(player, name)
+local root = getRoot(player)
+if not root then return end
+local target = workspace:FindFirstChild(name, true)
+if target then
+local cf
+if target:IsA("BasePart") then
+cf = target.CFrame
+elseif target:IsA("Model") then
+cf = target:GetPivot()
+end
+if cf then
+root.CFrame = cf + Vector3.new(0, 4, 0)
+return
+end
+end
+notify(player, "Não encontrei '" .. name .. "'. Crie uma peça ou modelo com esse nome no Workspace.")
+end
+remote.OnServerEvent:Connect(function(player, action, value)
+if not isAdmin(player) then
+notify(player, "Acesso negado: seu UserId não está na lista de administradores.")
+return
+end
+local humanoid = getHumanoid(player)
+if action == "Speed" then
+if humanoid and typeof(value) == "number" then
+humanoid.WalkSpeed = math.clamp(value, 16, 100)
+end
+elseif action == "Jump" then
+if humanoid and typeof(value) == "number" then
+humanoid.UseJumpPower = true
+humanoid.JumpPower = math.clamp(value, 50, 150)
+end
+elseif action == "Reset" then
+if player.Character then player.Character:BreakJoints() end
+elseif action == "Coordinates" then
+local root = getRoot(player)
+if root then
+remote:FireClient(player, "Coordinates", string.format("X %.1f | Y %.1f | Z %.1f", root.Position.X, root.Position.Y, root.Position.Z))
+end
+elseif action == "Fly" then
+local enabled = not (states[player] and states[player].fly)
+setFly(player, enabled)
+notify(player, "Voo de teste: " .. (enabled and "ligado" or "desligado"))
+elseif action == "Noclip" then
+local enabled = not (states[player] and states[player].noclip)
+setNoclip(player, enabled)
+notify(player, "Noclip de teste: " .. (enabled and "ligado" or "desligado"))
+elseif action == "HighlightNPCs" then
+local count = 0
+for _, obj in ipairs(CollectionService:GetTagged("TrainingTarget")) do
+if obj:IsA("Model") or obj:IsA("BasePart") then
+local h = obj:FindFirstChildOfClass("Highlight")
+if not h then
+h = Instance.new("Highlight")
+h.Name = "BrasilTrainingHighlight"
+h.FillColor = Color3.fromRGB(0, 200, 255)
+h.OutlineColor = Color3.new(1,1,1)
+h.Parent = obj
+end
+count += 1
+end
+end
+notify(player, "NPCs/objetos de treino destacados: " .. count .. ". Use a tag TrainingTarget.")
+elseif action == "TeleportSpawn" then
+teleportNamed(player, "Spawn")
+elseif action == "TeleportLobby" then
+teleportNamed(player, "Lobby")
+elseif action == "Close" then
+remote:FireClient(player, "Close")
+else
+notify(player, "Ação desconhecida.")
+end
+end)
+Players.PlayerRemoving:Connect(function(player)
+states[player] = nil
+end)
+Players.PlayerAdded:Connect(function(player)
+player.CharacterAdded:Connect(function()
+task.wait(1)
+local st = states[player]
+if st and st.noclip then setNoclip(player, true) end
+if st and st.fly then setFly(player, true) end
+end)
+end)
