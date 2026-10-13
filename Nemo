@@ -1,0 +1,481 @@
+# -- NEMO PANEL | Mobile-stability revision (Roblox Studio LocalScript)
+-- Intended for a Roblox experience you own/control; not an executor bypass.
+-- A client script cannot grant server-side admin permissions.
+-- Training highlights are limited to models tagged "TrainingTarget".
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local CollectionService = game:GetService("CollectionService")
+local player = Players.LocalPlayer
+if not player then return end
+
+-- Avoid duplicate interfaces when the LocalScript is started again.
+local playerGui = player:WaitForChild("PlayerGui")
+local previousGui = playerGui:FindFirstChild("NemoPanel")
+if previousGui then previousGui:Destroy() end
+
+local purple = Color3.fromRGB(164, 45, 255)
+local bg = Color3.fromRGB(17, 17, 20)
+local panel = Color3.fromRGB(27, 27, 31)
+local white = Color3.fromRGB(242, 242, 247)
+local muted = Color3.fromRGB(155, 155, 165)
+local green = Color3.fromRGB(55, 220, 115)
+
+local settings = {
+    ShowFOV = false, ESP = false, ShowCoords = true,
+    Speed = 16, Jump = 50, FOV = 70, MaxDistance = 200,
+    TriggerDelay = 50, RCS = 50,
+}
+local currentTab = "Aim"
+local espObjects = {}
+local gui, main, content, sidebar
+local renderTab
+
+local function notify(message)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Nemo Panel", Text = tostring(message), Duration = 3
+        })
+    end)
+end
+
+local function getParts()
+    local char = player.Character
+    return char, char and char:FindFirstChildOfClass("Humanoid"),
+        char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function clearESP()
+    for _, obj in ipairs(espObjects) do
+        if obj then pcall(function() obj:Destroy() end) end
+    end
+    table.clear(espObjects)
+end
+
+local function refreshESP()
+    clearESP()
+    if not settings.ESP then return end
+    local _, _, root = getParts()
+    if not root then return end
+    for _, model in ipairs(CollectionService:GetTagged("TrainingTarget")) do
+        if model:IsA("Model") and model ~= player.Character then
+            local targetRoot = model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
+            if targetRoot and (targetRoot.Position - root.Position).Magnitude <= settings.MaxDistance then
+                local highlight = Instance.new("Highlight")
+                highlight.Name = "NemoTrainingHighlight"
+                highlight.Adornee = model
+                highlight.FillColor = green
+                highlight.OutlineColor = purple
+                highlight.FillTransparency = 0.65
+                highlight.Parent = model
+                table.insert(espObjects, highlight)
+
+                local bb = Instance.new("BillboardGui")
+                bb.Name = "NemoTrainingLabel"
+                bb.Adornee = targetRoot
+                bb.Size = UDim2.fromOffset(180, 30)
+                bb.StudsOffset = Vector3.new(0, 3, 0)
+                bb.AlwaysOnTop = true
+                bb.Parent = gui
+                table.insert(espObjects, bb)
+
+                local label = Instance.new("TextLabel")
+                label.Size = UDim2.fromScale(1, 1)
+                label.BackgroundTransparency = 1
+                label.TextColor3 = white
+                label.TextStrokeTransparency = 0.2
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 13
+                label.Parent = bb
+                label.Text = model.Name .. " • " ..
+                    math.floor((targetRoot.Position - root.Position).Magnitude) .. " studs"
+            end
+        end
+    end
+end
+
+gui = Instance.new("ScreenGui")
+gui.Name = "NemoPanel"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = false
+gui.Parent = playerGui
+
+main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0.94, 0, 0.72, 0)
+main.Position = UDim2.new(0.03, 0, 0.14, 0)
+main.BackgroundColor3 = bg
+main.BorderSizePixel = 0
+main.Parent = gui
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+local outline = Instance.new("UIStroke", main)
+outline.Color = purple
+outline.Transparency = 0.35
+local size = Instance.new("UISizeConstraint", main)
+-- Keep the minimum small enough for compact phone screens.
+size.MinSize = Vector2.new(250, 300)
+size.MaxSize = Vector2.new(850, 650)
+
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 44)
+header.BackgroundColor3 = Color3.fromRGB(23, 23, 27)
+header.BorderSizePixel = 0
+header.Parent = main
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
+
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Position = UDim2.new(0, 12, 0, 0)
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Text = "N E M O   /   PANEL"
+title.TextColor3 = purple
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = header
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.fromOffset(32, 30)
+close.Position = UDim2.new(1, -38, 0, 7)
+close.BackgroundColor3 = panel
+close.Text = "×"
+close.TextColor3 = white
+close.TextSize = 20
+close.Font = Enum.Font.GothamBold
+close.Parent = header
+Instance.new("UICorner", close).CornerRadius = UDim.new(0, 6)
+close.Activated:Connect(function() main.Visible = false end)
+
+sidebar = Instance.new("Frame")
+sidebar.Position = UDim2.new(0, 0, 0, 44)
+sidebar.Size = UDim2.new(0, 76, 1, -44)
+sidebar.BackgroundColor3 = Color3.fromRGB(13, 13, 16)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = main
+local navLayout = Instance.new("UIListLayout", sidebar)
+navLayout.Padding = UDim.new(0, 5)
+navLayout.SortOrder = Enum.SortOrder.LayoutOrder
+local navPadding = Instance.new("UIPadding", sidebar)
+navPadding.PaddingTop = UDim.new(0, 8)
+navPadding.PaddingLeft = UDim.new(0, 4)
+navPadding.PaddingRight = UDim.new(0, 4)
+
+content = Instance.new("ScrollingFrame")
+content.Position = UDim2.new(0, 82, 0, 52)
+content.Size = UDim2.new(1, -89, 1, -60)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 3
+content.ScrollBarImageColor3 = purple
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.CanvasSize = UDim2.new()
+content.Parent = main
+local layout = Instance.new("UIListLayout", content)
+layout.Padding = UDim.new(0, 7)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+local pad = Instance.new("UIPadding", content)
+pad.PaddingTop = UDim.new(0, 4)
+pad.PaddingBottom = UDim.new(0, 10)
+pad.PaddingLeft = UDim.new(0, 4)
+pad.PaddingRight = UDim.new(0, 4)
+
+-- Drag by header; works with touch and mouse.
+do
+    local dragging, startInput, startPos
+    header.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging, startInput, startPos = true, input.Position, main.Position
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - startInput
+            main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    UIS.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+end
+
+local navButtons = {}
+local function clearContent()
+    for _, child in ipairs(content:GetChildren()) do
+        if child ~= layout and child ~= pad then child:Destroy() end
+    end
+end
+
+local function section(text)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -2, 0, 32)
+    frame.BackgroundColor3 = panel
+    frame.BorderSizePixel = 0
+    frame.Parent = content
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Position = UDim2.new(0, 9, 0, 0)
+    label.Size = UDim2.new(1, -18, 1, 0)
+    label.Text = "✦  " .. text
+    label.TextColor3 = white
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+end
+
+local function button(text, callback, active)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -2, 0, 36)
+    b.BackgroundColor3 = active and Color3.fromRGB(65, 28, 92) or panel
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.TextColor3 = white
+    b.TextSize = 12
+    b.TextWrapped = true
+    b.Font = Enum.Font.Gotham
+    b.Parent = content
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.Activated:Connect(callback)
+    return b
+end
+
+local function toggle(text, key, callback)
+    local b
+    local function update()
+        b.Text = (settings[key] and "☑  " or "□  ") .. text
+        b.BackgroundColor3 = settings[key] and Color3.fromRGB(65, 28, 92) or panel
+    end
+    b = button("", function()
+        settings[key] = not settings[key]
+        update()
+        if callback then callback(settings[key]) end
+    end)
+    update()
+end
+
+local function valueControl(text, key, minimum, maximum, step, suffix, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -2, 0, 40)
+    row.BackgroundColor3 = panel
+    row.BorderSizePixel = 0
+    row.Parent = content
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Position = UDim2.new(0, 8, 0, 0)
+    label.Size = UDim2.new(1, -88, 1, 0)
+    label.TextColor3 = white
+    label.TextSize = 11
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local function update()
+        label.Text = text .. ": " .. tostring(settings[key]) .. suffix
+    end
+    local minus = Instance.new("TextButton")
+    minus.Size = UDim2.fromOffset(26, 28)
+    minus.Position = UDim2.new(1, -59, 0.5, -14)
+    minus.BackgroundColor3 = Color3.fromRGB(56, 34, 70)
+    minus.Text = "−"
+    minus.TextColor3 = white
+    minus.TextSize = 17
+    minus.Parent = row
+    Instance.new("UICorner", minus).CornerRadius = UDim.new(0, 5)
+    local plus = Instance.new("TextButton")
+    plus.Size = UDim2.fromOffset(26, 28)
+    plus.Position = UDim2.new(1, -29, 0.5, -14)
+    plus.BackgroundColor3 = purple
+    plus.Text = "+"
+    plus.TextColor3 = white
+    plus.TextSize = 17
+    plus.Parent = row
+    Instance.new("UICorner", plus).CornerRadius = UDim.new(0, 5)
+
+    minus.Activated:Connect(function()
+        settings[key] = math.clamp(settings[key] - step, minimum, maximum)
+        update()
+        if callback then callback(settings[key]) end
+    end)
+    plus.Activated:Connect(function()
+        settings[key] = math.clamp(settings[key] + step, minimum, maximum)
+        update()
+        if callback then callback(settings[key]) end
+    end)
+    update()
+end
+
+local function applyMovement()
+    local _, hum = getParts()
+    if hum then
+        hum.WalkSpeed = settings.Speed
+        hum.UseJumpPower = true
+        hum.JumpPower = settings.Jump
+    else
+        notify("Seu personagem ainda não carregou.")
+    end
+end
+
+local function updateFOV(value)
+    local cam = workspace.CurrentCamera
+    if cam then cam.FieldOfView = value end
+end
+
+renderTab = function(tab)
+    currentTab = tab
+    clearContent()
+    for name, b in pairs(navButtons) do
+        b.BackgroundColor3 = name == tab and Color3.fromRGB(65, 28, 92) or Color3.fromRGB(13, 13, 16)
+        b.TextColor3 = name == tab and white or muted
+    end
+
+    if tab == "Aim" then
+        section("AIM SETTINGS")
+        toggle("Mostrar FOV visual", "ShowFOV", function(v)
+            notify(v and "FOV visual ligado." or "FOV visual desligado.")
+        end)
+        valueControl("Campo de visão da câmera", "FOV", 40, 100, 5, "°", updateFOV)
+        section("TRAINING")
+        button("Centralizar câmera no personagem", function()
+            local _, _, root = getParts()
+            local cam = workspace.CurrentCamera
+            if root and cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, root.Position) end
+        end)
+        button("Mira automática não incluída; ferramentas de treino apenas.", function() end)
+    elseif tab == "Trigger" then
+        section("TRIGGER TRAINING")
+        valueControl("Delay de treino", "TriggerDelay", 0, 500, 25, " ms", nil)
+        button("Detectar alvo de treino próximo", function()
+            local _, _, root = getParts()
+            if not root then return end
+            local nearest, dist
+            for _, model in ipairs(CollectionService:GetTagged("TrainingTarget")) do
+                local targetRoot = model:IsA("Model") and (model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart)
+                if targetRoot then
+                    local d = (targetRoot.Position - root.Position).Magnitude
+                    if not dist or d < dist then nearest, dist = model, d end
+                end
+            end
+            if nearest then notify("Alvo: " .. nearest.Name .. " • " .. math.floor(dist) .. " studs")
+            else notify("Nenhum TrainingTarget encontrado.") end
+        end, true)
+        valueControl("Intensidade visual RCS", "RCS", 0, 100, 10, "%", nil)
+    elseif tab == "ESP" then
+        section("ESP • TRAINING TARGETS")
+        toggle("Destacar NPCs marcados", "ESP", refreshESP)
+        button("Atualizar destaques", refreshESP)
+        valueControl("Distância máxima", "MaxDistance", 25, 1000, 25, " studs", refreshESP)
+        button("Use a tag TrainingTarget nos NPCs do seu jogo.", function()
+            notify("No Studio, adicione a tag TrainingTarget ao modelo do NPC.")
+        end)
+    elseif tab == "Radar" then
+        section("LOCAL RADAR")
+        toggle("Mostrar coordenadas", "ShowCoords", nil)
+        valueControl("Alcance de detecção", "MaxDistance", 25, 1000, 25, " studs", refreshESP)
+        local _, _, root = getParts()
+        if root and settings.ShowCoords then
+            local p = root.Position
+            button(string.format("X %.1f   Y %.1f   Z %.1f", p.X, p.Y, p.Z), function()
+                notify(string.format("X %.1f / Y %.1f / Z %.1f", p.X, p.Y, p.Z))
+            end)
+        end
+        button("Atualizar coordenadas", function() renderTab("Radar") end)
+    elseif tab == "Misc" then
+        section("MOVEMENT")
+        valueControl("Velocidade", "Speed", 0, 100, 4, "", applyMovement)
+        valueControl("Força do pulo", "Jump", 0, 150, 5, "", applyMovement)
+        button("Restaurar velocidade e pulo padrão", function()
+            settings.Speed, settings.Jump = 16, 50
+            applyMovement()
+            renderTab("Misc")
+        end)
+        button("Resetar personagem local", function()
+            local _, hum = getParts()
+            if hum then hum.Health = 0 end
+        end)
+        section("MENU")
+        button("Fechar painel", function() main.Visible = false end)
+    elseif tab == "Players" then
+        section("PLAYER LIST")
+        button("A lista administrativa real precisa de RemoteFunction no servidor.", function()
+            notify("Um script de cliente isolado não pode autorizar ações de servidor.")
+        end)
+        button("Trazer/teleportar/congelar outros jogadores requer integração com seu servidor.", function()
+            notify("Adicione RemoteFunctions e valide UserIds de admins no servidor do seu jogo.")
+        end)
+    end
+end
+
+for i, info in ipairs({
+    {"Aim", "◎"}, {"Trigger", "ϟ"}, {"ESP", "◉"},
+    {"Radar", "◧"}, {"Players", "♙"}, {"Misc", "⚙"},
+}) do
+    local name, symbol = info[1], info[2]
+    local b = Instance.new("TextButton")
+    b.LayoutOrder = i
+    b.Size = UDim2.new(1, 0, 0, 43)
+    b.BackgroundColor3 = Color3.fromRGB(13, 13, 16)
+    b.BorderSizePixel = 0
+    b.Text = symbol .. "\n" .. name
+    b.TextColor3 = muted
+    b.TextSize = 11
+    b.Font = Enum.Font.Gotham
+    b.Parent = sidebar
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    b.Activated:Connect(function() renderTab(name) end)
+    navButtons[name] = b
+end
+
+player.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    applyMovement()
+    if settings.ESP then refreshESP() end
+end)
+
+-- Refresh labels at a modest interval instead of every frame to reduce mobile load.
+local espUpdateElapsed = 0
+RunService.Heartbeat:Connect(function(dt)
+    if not settings.ESP then return end
+    espUpdateElapsed += dt
+    if espUpdateElapsed < 0.25 then return end
+    espUpdateElapsed = 0
+
+    local _, _, root = getParts()
+    if not root then return end
+    for i = #espObjects, 1, -1 do
+        local obj = espObjects[i]
+        if not obj or not obj.Parent then
+            table.remove(espObjects, i)
+        elseif obj:IsA("BillboardGui") and obj.Adornee and obj.Adornee.Parent then
+            local label = obj:FindFirstChildOfClass("TextLabel")
+            if label then
+                label.Text = obj.Adornee.Parent.Name .. " • " ..
+                    math.floor((obj.Adornee.Position - root.Position).Magnitude) .. " studs"
+            end
+        end
+    end
+end)
+
+-- A small floating reopen button for touch devices.
+local reopen = Instance.new("TextButton")
+reopen.Name = "NemoReopen"
+reopen.Size = UDim2.fromOffset(54, 48)
+reopen.Position = UDim2.new(1, -62, 0.5, -24)
+reopen.BackgroundColor3 = Color3.fromRGB(55, 22, 78)
+reopen.Text = "N"
+reopen.TextColor3 = white
+reopen.TextSize = 21
+reopen.Font = Enum.Font.GothamBold
+reopen.Parent = gui
+Instance.new("UICorner", reopen).CornerRadius = UDim.new(0, 12)
+reopen.Activated:Connect(function() main.Visible = not main.Visible end)
+
+renderTab("Aim")
+notify("Nemo Panel carregado. Use no Roblox Studio em uma experiência sua.")
+Nemo-store
